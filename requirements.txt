@@ -1,0 +1,5 @@
+pywhispercpp
+ollama-python
+requests
+# Optional, for real-time playback
+pyaudio
