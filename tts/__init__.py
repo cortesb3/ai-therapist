@@ -3,19 +3,21 @@ import sounddevice as sd
 import numpy as np
 import tempfile
 import scipy.io.wavfile
+import io
 
 class TextToSpeech:
     def __init__(self, model_name="tts_models/en/ljspeech/tacotron2-DDC"):
         self.tts = TTS(model_name)
 
-    def synthesize(self, text, output_path="output.wav"):
-        # Synthesize speech and save to WAV file
+    def synthesize(self, text):
+        # Synthesize speech and return as bytes (do not save to disk)
         wav = self.tts.tts(text=text)
-        # Normalize and save as 16-bit PCM WAV
         wav = np.array(wav)
         wav_int16 = np.int16(wav / np.max(np.abs(wav)) * 32767)
-        scipy.io.wavfile.write(output_path, self.tts.synthesizer.output_sample_rate, wav_int16)
-        return output_path
+        buf = io.BytesIO()
+        scipy.io.wavfile.write(buf, self.tts.synthesizer.output_sample_rate, wav_int16)
+        buf.seek(0)
+        return buf.read()
 
     def play(self, text):
         # Synthesize and play audio directly

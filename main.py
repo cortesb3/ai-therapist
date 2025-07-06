@@ -68,11 +68,8 @@ def main():
         print("LLM response:", response)
 
         print("Speaking response...")
-        output_wav = "output.wav"
-        tts.synthesize(response, output_path=output_wav)
-        with open(output_wav, "rb") as f:
-            wav_bytes = f.read()
-        play_audio_stream([wav_bytes])
+        audio_bytes = tts.synthesize(response)
+        play_audio_stream([audio_bytes])
         print("Done speaking.")
 
         again = input("Press Enter for another round, or type 'q' to quit: ")
