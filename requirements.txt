@@ -1,5 +1,6 @@
 pywhispercpp
-ollama-python
+ollama
 requests
-# Optional, for real-time playback
+sounddevice
+numpy
 pyaudio
