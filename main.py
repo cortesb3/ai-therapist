@@ -1,23 +1,42 @@
+import sounddevice as sd
+import numpy as np
+import wave
+import tempfile
+import os
 from stt import SpeechToText
 from llm import LanguageModel
 from tts import TextToSpeech
 
-# Optional: for real-time playback (local testing)
-try:
-    import pyaudio
-except ImportError:
-    pyaudio = None
+SAMPLE_RATE = 16000
+CHANNELS = 1
+DTYPE = 'int16'
+
+
+def record_audio(filename, duration=None):
+    print("Press Enter to start recording...")
+    input()
+    print("Recording... Press Enter to stop.")
+    recording = []
+    def callback(indata, frames, time, status):
+        recording.append(indata.copy())
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, callback=callback):
+        input()  # Wait for Enter to stop
+    audio = np.concatenate(recording, axis=0)
+    with wave.open(filename, 'wb') as wf:
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(np.dtype(DTYPE).itemsize)
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(audio.tobytes())
+    print(f"Saved recording to {filename}")
+
 
 def play_audio_stream(audio_chunks, rate=22050):
-    """Play audio chunks in real time using PyAudio (WAV, 16-bit PCM, mono)."""
-    if not pyaudio:
-        print("PyAudio not installed. Install with 'pip install pyaudio' for real-time playback.")
-        return
+    import pyaudio
     p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paInt16, channels=1, rate=rate, output=True)
+    stream = p.open(format=pyaudio.paInt16, 
+    channels=1, rate=rate, output=True)
     header_skipped = False
     for chunk in audio_chunks:
-        # Skip WAV header (44 bytes) on first chunk
         if not header_skipped and len(chunk) > 44:
             chunk = chunk[44:]
             header_skipped = True
@@ -26,37 +45,39 @@ def play_audio_stream(audio_chunks, rate=22050):
     stream.close()
     p.terminate()
 
+
 def main():
     stt = SpeechToText()
     llm = LanguageModel()
     tts = TextToSpeech()
 
-    # Use default audio file if available
-    default_audio_path = "computer_mail_waiting_16k.wav"
-    print(f"Press Enter to use the default audio file: {default_audio_path}")
-    audio_path = input("Audio file path: ").strip()
-    if not audio_path:
-        audio_path = default_audio_path
-    text = stt.transcribe(audio_path)
-    print("You said:", text)
+    while True:
+        print("\n--- New Interaction ---")
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            audio_path = tmp.name
+        record_audio(audio_path)
+        text = stt.transcribe(audio_path)
+        print("You said:", text)
+        os.remove(audio_path)
 
-    response = llm.generate(text)
-    print("LLM response:", response)
+        if not text.strip():
+            print("No speech detected. Try again.")
+            continue
 
-    # --- Streaming TTS Example ---
-    print("Speaking response (streaming)...")
-    audio_chunks = tts.stream_synthesize(response)
-    play_audio_stream(audio_chunks)
-    print("Done speaking.")
+        response = llm.generate(text)
+        print("LLM response:", response)
 
-    # --- File-based fallback ---
-    # tts.synthesize(response)
-    # print("Response spoken and saved to output.wav")
+        print("Speaking response...")
+        output_wav = "output.wav"
+        tts.synthesize(response, output_path=output_wav)
+        with open(output_wav, "rb") as f:
+            wav_bytes = f.read()
+        play_audio_stream([wav_bytes])
+        print("Done speaking.")
 
-    # TODO: Replace audio input/output with LiveKit/WebRTC streams for full-duplex, interruptible UX
-    # - Receive audio from LiveKit, transcribe in real time
-    # - On user interruption, stop TTS playback and restart loop
-    # - Send TTS audio chunks to LiveKit for playback
+        again = input("Press Enter for another round, or type 'q' to quit: ")
+        if again.strip().lower() == 'q':
+            break
 
 if __name__ == "__main__":
     main()

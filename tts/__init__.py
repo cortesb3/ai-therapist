@@ -1,28 +1,25 @@
-import requests
+from TTS.api import TTS
+import sounddevice as sd
+import numpy as np
+import tempfile
+import scipy.io.wavfile
 
 class TextToSpeech:
-    def __init__(self, api_url="http://localhost:4123/v1/audio/speech/stream"):
-        self.api_url = api_url
+    def __init__(self, model_name="tts_models/en/ljspeech/tacotron2-DDC"):
+        self.tts = TTS(model_name)
 
     def synthesize(self, text, output_path="output.wav"):
-        # For compatibility: download full audio (not streaming)
-        response = requests.post(self.api_url.replace("/stream", ""), json={"input": text})
-        response.raise_for_status()
-        with open(output_path, "wb") as f:
-            f.write(response.content)
+        # Synthesize speech and save to WAV file
+        wav = self.tts.tts(text=text)
+        # Normalize and save as 16-bit PCM WAV
+        wav = np.array(wav)
+        wav_int16 = np.int16(wav / np.max(np.abs(wav)) * 32767)
+        scipy.io.wavfile.write(output_path, self.tts.synthesizer.output_sample_rate, wav_int16)
         return output_path
 
-    def stream_synthesize(self, text, chunk_size=8192):
-        """
-        Stream audio chunks from the TTS API (for real-time playback or LiveKit integration).
-        Yields bytes chunks as they arrive.
-        """
-        response = requests.post(
-            self.api_url,
-            json={"input": text, "streaming_strategy": "sentence", "streaming_chunk_size": 200},
-            stream=True
-        )
-        response.raise_for_status()
-        for chunk in response.iter_content(chunk_size=chunk_size):
-            if chunk:
-                yield chunk
+    def play(self, text):
+        # Synthesize and play audio directly
+        wav = self.tts.tts(text=text)
+        wav = np.array(wav)
+        sd.play(wav, self.tts.synthesizer.output_sample_rate)
+        sd.wait()

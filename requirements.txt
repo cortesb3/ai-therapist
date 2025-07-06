@@ -2,5 +2,6 @@ pywhispercpp
 ollama
 requests
 sounddevice
-numpy
+numpy==1.22.0
 pyaudio
+scipy==1.11.4
