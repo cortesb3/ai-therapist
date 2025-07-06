@@ -125,11 +125,19 @@ def main():
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
-            sys.stdin.read(1)  # Wait for any key
-            print("Interrupting playback...")
-            stop_playback.set()
+            key = sys.stdin.read(1)  # Wait for any key
+            if key == '\r' or key == '\n':
+                print("Interrupting playback with Enter. Returning to recording...")
+                stop_playback.set()
+                t.join()
+                continue  # Go back to recording automatically
+            else:
+                print("Interrupting playback with other key.")
+                stop_playback.set()
         except KeyboardInterrupt:
             print("\nExiting...")
+            stop_playback.set()
+            t.join()
             break
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
