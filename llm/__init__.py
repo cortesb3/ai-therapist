@@ -16,13 +16,23 @@ class LanguageModel:
     ):
         self.model_name = model_name
         self.system_prompt = system_prompt
+        self.history = []  # Store conversation history as a list of messages
 
     def generate(self, prompt):
+        # Add the new user message to history
+        self.history.append({"role": "user", "content": prompt})
+        # Build the full message list: system prompt, then history
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            *self.history
+        ]
         response = ollama.chat(
             model=self.model_name,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": prompt}
-            ]
+            messages=messages
         )
+        # Add the assistant's reply to history
+        self.history.append({"role": "assistant", "content": response['message']['content']})
         return response['message']['content']
+
+    def reset(self):
+        self.history = []

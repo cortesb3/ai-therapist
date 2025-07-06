@@ -8,7 +8,7 @@ import threading
 import time
 
 class TextToSpeech:
-    def __init__(self, model_name="tts_models/en/ljspeech/tacotron2-DDC"):
+    def __init__(self, model_name="tts_models/en/ljspeech/fast_pitch"):
         self.tts = TTS(model_name)
 
     def synthesize(self, text):
