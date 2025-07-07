@@ -14,5 +14,6 @@ dependencies = [
     "scipy==1.11.4",
     "setuptools>=80.9.0",
     "sounddevice>=0.5.2",
+    "webrtcvad-wheels>=2.0.14",
     "wheel>=0.45.1",
 ]

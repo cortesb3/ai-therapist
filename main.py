@@ -7,6 +7,8 @@ import signal
 from stt import SpeechToText
 from llm import LanguageModel
 from tts import TextToSpeech
+import webrtcvad
+import time
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -19,46 +21,60 @@ def signal_handler(sig, frame):
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
 
-def record_audio(filename, duration=None):
-    print("Recording... Press any key or Ctrl+C to stop.")
-    import sys
-    import termios
-    import tty
-    import threading
-    recording = []
-    stop = threading.Event()
-    def callback(indata, frames, time, status):
-        recording.append(indata.copy())
-        if stop.is_set():
-            raise sd.CallbackStop()
-    def key_listener():
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            sys.stdin.read(1)
-            stop.set()
-        except KeyboardInterrupt:
-            stop.set()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    listener_thread = threading.Thread(target=key_listener)
-    listener_thread.start()
-    try:
-        with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, callback=callback):
-            while not stop.is_set():
-                sd.sleep(100)
-    except KeyboardInterrupt:
-        print("\nRecording interrupted.")
-        stop.set()
-    audio = np.concatenate(recording, axis=0) if recording else np.zeros((0, CHANNELS), dtype=DTYPE)
-    with wave.open(filename, 'wb') as wf:
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(np.dtype(DTYPE).itemsize)
-        wf.setframerate(SAMPLE_RATE)
-        wf.writeframes(audio.tobytes())
-    print(f"Saved recording to {filename}")
-    listener_thread.join()
+def record_audio_vad(filename, aggressiveness=2, max_record_time=30, silence_timeout=1.0):
+    print("Listening... (speak to start, stop talking to end)")
+    vad = webrtcvad.Vad(aggressiveness)
+    import sounddevice as sd
+    import numpy as np
+    import wave
+    import time
+
+    sample_rate = SAMPLE_RATE
+    frame_duration = 30  # ms
+    frame_size = int(sample_rate * frame_duration / 1000)
+    buffer = []
+    silence_start = None
+    started = False
+    start_time = time.time()
+
+    def is_speech(frame_bytes):
+        return vad.is_speech(frame_bytes, sample_rate)
+
+    with sd.InputStream(samplerate=sample_rate, channels=1, dtype='int16') as stream:
+        while True:
+            frame, _ = stream.read(frame_size)
+            frame_bytes = frame.tobytes()
+            if is_speech(frame_bytes):
+                buffer.append(frame)
+                if not started:
+                    started = True
+                    print("Speech detected, recording...")
+                silence_start = None
+            else:
+                if started:
+                    if silence_start is None:
+                        silence_start = time.time()
+                    elif time.time() - silence_start > silence_timeout:
+                        print("Silence detected, stopping recording.")
+                        break
+            if started and (time.time() - start_time > max_record_time):
+                print("Max record time reached, stopping.")
+                break
+    if buffer:
+        audio = np.concatenate(buffer, axis=0)
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(np.dtype('int16').itemsize)
+            wf.setframerate(sample_rate)
+            wf.writeframes(audio.tobytes())
+        print(f"Saved recording to {filename}")
+    else:
+        print("No speech detected.")
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(np.dtype('int16').itemsize)
+            wf.setframerate(sample_rate)
+            wf.writeframes(b"")
 
 
 def play_audio_stream(audio_chunks, rate=22050, stop_event=None):
@@ -95,7 +111,7 @@ def main():
         print("\n--- New Interaction ---")
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
             audio_path = tmp.name
-        record_audio(audio_path)
+        record_audio_vad(audio_path)
         text = stt.transcribe(audio_path)
         print("You said:", text)
         os.remove(audio_path)
@@ -107,11 +123,12 @@ def main():
         response = llm.generate(text)
         print("LLM response:", response)
 
-        print("Speaking response... (Press any key to interrupt)")
+        print("Speaking response... (Press Enter to interrupt)")
         import threading
         import sys
         import termios
         import tty
+        import select
         stop_playback = threading.Event()
         def playback():
             try:
@@ -120,33 +137,37 @@ def main():
                 print(f"Playback error: {e}")
         t = threading.Thread(target=playback)
         t.start()
-        # Set terminal to raw mode to capture any key
+        # Set terminal to raw mode to capture Enter key
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
-            key = sys.stdin.read(1)  # Wait for any key
-            if key == '\r' or key == '\n':
-                print("Interrupting playback with Enter. Returning to recording...")
-                stop_playback.set()
-                t.join()
-                continue  # Go back to recording automatically
-            else:
-                print("Interrupting playback with other key.")
-                stop_playback.set()
+            print("(Press Enter to interrupt and record, Ctrl+C to exit)")
+            while t.is_alive():
+                dr, _, _ = select.select([sys.stdin], [], [], 0.05)
+                if dr:
+                    key = sys.stdin.read(1)
+                    if key == '\x03':  # Ctrl+C
+                        print("\nExiting...")
+                        stop_playback.set()
+                        t.join()
+                        sys.exit(0)
+                    if key == '\r' or key == '\n':
+                        print("Interrupting playback with Enter. Returning to recording...")
+                        stop_playback.set()
+                        break
+                if stop_playback.is_set():
+                    break
         except KeyboardInterrupt:
             print("\nExiting...")
             stop_playback.set()
             t.join()
-            break
+            sys.exit(0)
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         t.join()
         print("Done speaking.")
-
-        again = input("Press Enter for another round, or type 'q' to quit: ")
-        if again.strip().lower() == 'q':
-            break
+        # Immediately loop back to next recording, no input() prompt
 
 if __name__ == "__main__":
     main()
