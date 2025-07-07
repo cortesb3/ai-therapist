@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Therapist Voice Demo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Therapist Voice Demo</h1>
+        <div class="controls">
+            <button id="recordBtn">Start Talking</button>
+            <input type="file" id="audioInput" accept="audio/wav" style="display:none;">
+            <button id="sendBtn" style="display:none;">Send File</button>
+        </div>
+        <div id="status"></div>
+        <audio id="audioPlayer" controls style="display:none;"></audio>
+    </div>
+    <script src="app.js"></script>
+    <script>
+        // If running locally, use the correct API URL
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            window.API_BASE_URL = 'http://localhost:5000';
+        } else {
+            window.API_BASE_URL = '';
+        }
+    </script>
+</body>
+</html>
