@@ -1,4 +1,5 @@
 from flask import Flask, request, send_file, jsonify
+from flask_cors import CORS
 import tempfile
 import os
 import traceback
@@ -7,6 +8,7 @@ from llm import LanguageModel
 from tts import TextToSpeech
 
 app = Flask(__name__)
+CORS(app)
 stt = SpeechToText()
 llm = LanguageModel()
 tts = TextToSpeech()
