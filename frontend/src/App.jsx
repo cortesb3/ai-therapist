@@ -1,12 +1,41 @@
 import React, { useRef, useState } from 'react';
 
 function App() {
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [greeting, setGreeting] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null); // For playback interruption
+  // Play greeting from backend TTS
+  const playGreeting = async () => {
+    setGreeting(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('greeting', '1');
+      const res = await fetch('/api/voice', {
+        method: 'POST',
+        body: form,
+      });
+      if (!res.ok) {
+        setError('Failed to get greeting from backend.');
+        setGreeting(false);
+        return;
+      }
+      const audioData = await res.blob();
+      const url = URL.createObjectURL(audioData);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setGreeting(false);
+      audio.play();
+    } catch (e) {
+      setError('Failed to play greeting.');
+      setGreeting(false);
+    }
+  };
 
   const handleStart = async () => {
     setError('');
@@ -130,6 +159,43 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 80 }}>
+      {!sessionStarted && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <h2 style={{ color: 'white', marginBottom: 24 }}>Welcome to Ava, your AI Voice Therapist</h2>
+          <button
+            style={{
+              padding: '18px 48px',
+              fontSize: 24,
+              borderRadius: 12,
+              background: '#2ecc71',
+              color: 'white',
+              border: 'none',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+              cursor: 'pointer',
+            }}
+            onClick={async () => {
+              setSessionStarted(true);
+              await playGreeting();
+            }}
+            disabled={greeting}
+          >
+            Start Session
+          </button>
+          {greeting && <p style={{ color: 'white', marginTop: 20 }}>Ava: "Hello! How can I help you today?"</p>}
+        </div>
+      )}
       <h1>AI Voice Therapist</h1>
       <button
         style={{
@@ -148,7 +214,7 @@ function App() {
         onMouseUp={handleButton}
         onTouchStart={handleButton}
         onTouchEnd={handleButton}
-        disabled={loading}
+        disabled={loading || !sessionStarted || greeting}
       >
         {recording ? 'Release to Send' : 'Push to Talk'}
       </button>

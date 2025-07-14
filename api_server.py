@@ -23,6 +23,25 @@ def get_llm_for_session(session_id):
 
 @app.route('/api/voice', methods=['POST'])
 def voice_interaction():
+    # Check for greeting param (either form or query string)
+    greeting = request.form.get('greeting') or request.args.get('greeting')
+    if greeting:
+        try:
+            greeting_text = "Hello! How can I help you today?"
+            tts_wav_bytes = tts.synthesize(greeting_text)
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tts_tmp:
+                tts_tmp.write(tts_wav_bytes)
+                tts_tmp.flush()
+                tts_path = tts_tmp.name
+            return send_file(tts_path, mimetype='audio/wav', as_attachment=True, download_name='greeting.wav')
+        except Exception as e:
+            print("[ERROR] Exception in greeting:")
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            if 'tts_path' in locals() and os.path.exists(tts_path):
+                os.remove(tts_path)
+
     if 'audio' not in request.files:
         return jsonify({'error': 'No audio file provided'}), 400
     audio_file = request.files['audio']
