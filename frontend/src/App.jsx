@@ -210,17 +210,14 @@ function App() {
           boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
           cursor: 'pointer',
         }}
-        onMouseDown={handleButton}
-        onMouseUp={handleButton}
-        onTouchStart={handleButton}
-        onTouchEnd={handleButton}
+        onClick={handleButton}
         disabled={loading || !sessionStarted || greeting}
       >
-        {recording ? 'Release to Send' : 'Push to Talk'}
+        {recording ? 'Stop Recording' : 'Push to Talk'}
       </button>
       {loading && <p>Processing...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      <p style={{ color: '#888', marginTop: 40 }}>Hold the button, speak, and release to talk to Ava.</p>
+      <p style={{ color: '#888', marginTop: 40 }}>Click the button to start and stop recording your message to Ava.</p>
     </div>
   );
 }

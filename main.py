@@ -24,10 +24,6 @@ signal.signal(signal.SIGINT, signal_handler)
 def record_audio_vad(filename, aggressiveness=2, max_record_time=30, silence_timeout=1.0):
     print("Listening... (speak to start, stop talking to end)")
     vad = webrtcvad.Vad(aggressiveness)
-    import sounddevice as sd
-    import numpy as np
-    import wave
-    import time
 
     sample_rate = SAMPLE_RATE
     frame_duration = 30  # ms

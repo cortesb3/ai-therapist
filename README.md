@@ -11,57 +11,52 @@ A modular, fully local pipeline for live voice interaction using:
 - ffmpeg (for audio conversion)
 - pyaudio (for real-time playback)
 
+
 ## Setup
 
-1. **Install Python dependencies:**
+1. **Install uv (Python package/dependency manager):**
    ```sh
-   cd ai-therapist
-   pip install -r requirements.txt
-   # or, if using uv:
-   uv pip install -r requirements.txt
+   brew install uv
    ```
 
-2. **Install ffmpeg (macOS):**
+2. **Install Python dependencies:**
+   ```sh
+   cd ai-therapist
+   uv sync
+   ```
+
+3. **Install ffmpeg (macOS):**
    ```sh
    brew install ffmpeg
    ```
 
-3. **Install pyaudio (for playback):**
-   ```sh
-   pip install pyaudio
-   # or
-   uv pip install pyaudio
-   ```
-
-4. **Install Coqui TTS (for TTS):**
-   - Coqui TTS supports Python 3.10 and 3.11. If you have Python 3.12+, create a Python 3.10 or 3.11 virtual environment.
-   - Then run:
-   ```sh
-   pip install TTS
-   # or
-   uv pip install TTS
-   ```
-   - If you get numpy/scipy build errors, install them first:
-   ```sh
-   pip install numpy scipy
-   # or
-   uv pip install numpy scipy
-   ```
-
-5. **Pull your LLM model with Ollama:**
+4. **Pull your LLM model with Ollama:**
    ```sh
    ollama pull llama3.2:latest
    # or any other model you want
    ```
 
-## Running the Live Voice Agent
+
+## Running the Backend API Server
 
 1. Make sure Ollama is running and your model is pulled.
 2. In the `ai-therapist` directory, run:
    ```sh
-   python main.py
+   uv run api_server.py
    ```
-3. Follow the prompts to record, transcribe, and interact live.
+   This will start the backend server at http://localhost:5000
+
+## Running the Frontend
+
+1. In a new terminal, go to the `frontend` directory:
+   ```sh
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   The app will be available at http://localhost:5173 and will proxy API requests to your backend.
+
+---
 
 ---
 
